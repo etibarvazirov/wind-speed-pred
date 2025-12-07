@@ -89,28 +89,35 @@ def preprocess(df):
     df["wind_dir_sin"] = np.sin(np.deg2rad(df["wind_direction"]))
     df["wind_dir_cos"] = np.cos(np.deg2rad(df["wind_direction"]))
 
-    # Create lags
+    # Lags
     df["lag1"] = df["wind_speed"].shift(1)
     df["lag3"] = df["wind_speed"].shift(3)
     df["lag6"] = df["wind_speed"].shift(6)
     df["lag12"] = df["wind_speed"].shift(12)
     df["lag24"] = df["wind_speed"].shift(24)
 
-    # Rolling windows
-    df["roll6_mean"] = df["wind_speed"].rolling(6).mean()
+    # Rollings
+    df["roll6_mean"]  = df["wind_speed"].rolling(6).mean()
     df["roll12_mean"] = df["wind_speed"].rolling(12).mean()
     df["roll24_mean"] = df["wind_speed"].rolling(24).mean()
-
-    df["roll6_std"] = df["wind_speed"].rolling(6).std()
+    df["roll6_std"]  = df["wind_speed"].rolling(6).std()
     df["roll12_std"] = df["wind_speed"].rolling(12).std()
     df["roll24_std"] = df["wind_speed"].rolling(24).std()
 
     df = df.dropna().reset_index(drop=True)
 
-    data = df[FEATURES]
+    print("DATAFRAME SHAPE:", df[FEATURES].shape)
+
+    data = df[FEATURES].to_numpy()
+    print("NUMPY SHAPE:", data.shape)
+    print("IS NUMPY:", isinstance(data, np.ndarray))
+
     data_scaled = scaler.transform(data)
+    print("SCALED TYPE:", type(data_scaled))
+    print("SCALED SHAPE:", data_scaled.shape)
 
     return data_scaled.reshape(1, SEQ_LEN, len(FEATURES))
+
 
 # ===================================================
 # PREDICT
@@ -139,6 +146,7 @@ if st.button("🔮 Predict Next Hour Wind Speed"):
     st.caption("Last 72 hours real wind speed from ERA5 API")
 
 st.info("Model: N-HiTS • Features: 16 • Sequence Length: 72 • Data: ERA5 Hourly")
+
 
 
 
