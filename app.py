@@ -44,7 +44,8 @@ def load_model():
     scaler = SimpleScaler(scaler_mean, scaler_scale)
 
     # Load model
-    model = NHiTS(seq_len=SEQ_LEN, num_features=len(FEATURES))
+    # model = NHiTS(seq_len=SEQ_LEN, num_features=len(FEATURES))
+    model = NHiTS(seq_len=168, num_features=15)
     model.load_state_dict(torch.load("n_hits_wind_model.pth", map_location="cpu"))
     model.eval()
 
@@ -130,5 +131,6 @@ if st.button("🔮 Predict Next Hour Wind Speed"):
     st.caption("Last 72 hours real wind speed from ERA5 API")
 
 st.info("Model: N-HiTS • Features: 16 • Sequence Length: 72 • Data: ERA5 Hourly")
+
 
 
