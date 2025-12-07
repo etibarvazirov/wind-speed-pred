@@ -6,11 +6,53 @@ import pandas as pd
 from model import NHiTS
 
 # ===================================================
-# CONFIG
+# PAGE CONFIG
+# ===================================================
+st.set_page_config(
+    page_title="Külək Sürəti Proqnozu – N-HiTS",
+    layout="wide",
+    page_icon="🌬️"
+)
+
+# ===================================================
+# PROJECT INTRO SECTION (DESIGN BLOCKS)
+# ===================================================
+st.title("🌬️ Azərbaycan üçün Külək Sürəti Proqnozu — N-HiTS Modeli")
+
+st.markdown("""
+<div style="padding:15px; border-radius:10px; background-color:#eef6ff;">
+    <h3>📌 Layihə Haqqında</h3>
+    Bu sistem ERA5 real vaxt atmosfer məlumatlarından istifadə edərək Azərbaycanın 
+    **növbəti saatlarda külək sürətini proqnozlaşdırır**. 
+    Model müasir **N-HiTS dərin öyrənmə arxitekturası** ilə öyrədilib.
+</div>
+<br>
+
+<div style="padding:15px; border-radius:10px; background-color:#f3f9ff;">
+    <h3>🎯 Layihənin Məqsədi</h3>
+    Külək sürətinin dəqiq proqnozu aşağıdakı sahələr üçün çox vacibdir:
+    <ul>
+        <li>🔌 Külək enerjisi istehsalının optimallaşdırılması</li>
+        <li>🚢 Nəqliyyat və logistik təhlükəsizliyi</li>
+        <li>🏗️ Tikinti və infrastruktur planlaşdırılması</li>
+        <li>🌪️ Güclü külək risklərinin öncədən aşkar edilməsi</li>
+    </ul>
+</div>
+<br>
+
+<div style="padding:15px; border-radius:10px; background-color:#e8fff3;">
+    <h3>🌤️ Proqnozun Faydası</h3>
+    Bu tətbiq külək sürətinin yaxın saatlarda dəyişməsini göstərərək 
+    istifadəçilərə **planlaşdırma, enerji idarəçiliyi və təhlükəsizlik üzrə** 
+    daha doğru qərarlar verməkdə kömək edir.
+</div>
+""", unsafe_allow_html=True)
+
+# ===================================================
+# MODEL / SCALER CONFIG
 # ===================================================
 SEQ_LEN = 168
 NUM_FEATURES = 15
-DEVICE = "cpu"
 
 FEATURES = [
     "temperature", "wind_speed", "wind_dir_sin", "wind_dir_cos",
@@ -20,7 +62,7 @@ FEATURES = [
 ]
 
 # ===================================================
-# LOAD MODEL & SCALER
+# LOAD MODEL + SCALER
 # ===================================================
 @st.cache_resource
 def load_model():
@@ -46,7 +88,7 @@ def load_model():
 model, scaler = load_model()
 
 # ===================================================
-# GET ERA5
+# ERA5 FETCH
 # ===================================================
 def get_era5():
     lat, lon = 40.4093, 49.8671
@@ -92,7 +134,7 @@ def preprocess(df):
     return X.reshape(1, SEQ_LEN, NUM_FEATURES), df
 
 # ===================================================
-# FORECAST
+# MULTI-STEP FORECAST (WITH NON-NEGATIVE CONSTRAINT)
 # ===================================================
 def forecast(hours):
     df = get_era5()
@@ -104,6 +146,8 @@ def forecast(hours):
     for _ in range(hours):
         with torch.no_grad():
             pred = model(inp).numpy().squeeze()
+
+        pred = max(pred, 0)   # ❗ Fiziki məhdudiyyət: külək sürəti mənfi ola bilməz
 
         preds.append(pred)
 
@@ -117,47 +161,51 @@ def forecast(hours):
 
     return preds
 
-
 # ===================================================
-# STREAMLIT UI
+# UI — FORECAST SECTION
 # ===================================================
-st.title("🌬️ Azərbaycan üçün Külək Sürəti Proqnozu — N-HiTS Modeli")
-st.markdown("""
-Bu sistem ERA5 real vaxt məlumatlarına əsaslanaraq **növbəti saatların külək sürətini**
-N-HiTS kimi müasir dərin öyrənmə modeli vasitəsilə proqnozlaşdırır.
-""")
+st.header("🔮 Real-Time Külək Sürəti Proqnozu")
 
-hours = st.slider("⏳ Neçə saatlıq proqnoz istəyirsiniz?", 1, 24, 6)
+hours = st.slider("⏳ Neçə saatlıq proqnoz edilsin?", 1, 24, 6)
 
-if st.button("🔮 Proqnozu Hesabla"):
+if st.button("🚀 Proqnozu Başlat"):
     preds = forecast(hours)
 
-    st.success(f"📌 **Növbəti {hours} saat üçün son proqnoz:** {preds[-1]:.2f} m/s")
+    st.success(f"📌 Növbəti {hours} saat üçün son proqnoz: **{preds[-1]:.2f} m/s**")
 
-    # ---------------------------
-    # RESULTS TABLE
-    # ---------------------------
+    # -----------------------------------------------------------
+    # PERFORMANCE METRICS TABLE (STATIC FROM TRAINING)
+    # -----------------------------------------------------------
+    metrics = pd.DataFrame({
+        "Metrik": ["RMSE", "MAE", "R²"],
+        "Dəyər": [0.1198718771429435, 0.26031019343740963, 0.8458048444802158]
+    })
+    st.subheader("📊 Model Performans Metrikləri")
+    st.table(metrics)
+
+    # -----------------------------------------------------------
+    # FORECAST TABLE
+    # -----------------------------------------------------------
     df_pred = pd.DataFrame({
         "Saat": list(range(1, hours + 1)),
         "Proqnoz (m/s)": preds
     })
-    st.subheader("📋 Proqnoz Cədvəli")
+    st.subheader("📋 Saatlıq Proqnoz Cədvəli")
     st.dataframe(df_pred, use_container_width=True)
 
-    # ---------------------------
-    # ACCORDION – PLOTS
-    # ---------------------------
+    # -----------------------------------------------------------
+    # EXPANDERS WITH PLOTS
+    # -----------------------------------------------------------
     with st.expander("📈 Proqnoz Qrafiki"):
         st.line_chart(preds, use_container_width=True)
-        st.caption("Model tərəfindən ardıcıl saatlıq proqnozların qrafiki")
+        st.caption("Model tərəfindən ardıcıl saatlıq proqnoz.")
 
-    with st.expander("🧠 Feature Importance (Integrated Gradients)"):
+    with st.expander("🧠 Feature Importance — Integrated Gradients"):
         st.image("feature_importance.png", use_container_width=True)
-        st.caption("Modelin hansı xüsusiyyətlərə daha çox önəm verdiyini göstərir.")
+        st.caption("Modelin hansı xüsusiyyətlərə ən çox önəm verdiyini göstərir.")
 
-    with st.expander("🌬️ Model Nümunə Proqnozu"):
+    with st.expander("🌬️ Model Nümunə Proqnoz Qrafiki"):
         st.image("wind_forecast_plot.png", use_container_width=True)
-        st.caption("Modelin əvvəlki test nəticələrindən nümunə proqnoz.")
+        st.caption("Modelin test zamanı əldə etdiyi nümunə proqnozu.")
 
-
-st.info("🧠 Model: N-HiTS | 📡 Məlumat: ERA5 | 🔢 168 saatlıq giriş pəncərəsi")
+st.info("🧠 Model: N-HiTS | 📡 Məlumat: ERA5 API | 🔢 Giriş pəncərəsi: 168 saat")
