@@ -30,13 +30,6 @@ img, .stPlotlyChart, .stImage > img {
 # Title Box
 st.markdown("""
 
-<style>
-.streamlit-expanderContent img {
-    max-width: 650px !important;
-    width: 650px !important;
-}
-</style>
-
 <div style="
     background-color:#e6f2ff;
     padding:18px;
@@ -235,9 +228,10 @@ if st.button("🚀 Proqnozu Hesabla"):
         st.image("feature_importance.png")
 
     with st.expander("🌬️ Modelin Nümunə Proqnozu"):
-        st.image("wind_forecast_plot.png", width=850)
+        st.image("wind_forecast_plot.png", use_container_width=True)
 
 st.info("🧠 Model: N-HiTS | 📡 ERA5 məlumatları | 🔢 Giriş pəncərəsi: 168 saat")
+
 
 
 
