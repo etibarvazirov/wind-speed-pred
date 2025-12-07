@@ -6,8 +6,17 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from model import NHiTS
 
+hide_streamlit_style = """
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+    </style>
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+
 # ============================================
-# PAGE CONFIG + GLOBAL CSS (fix big charts)
+# PAGE CONFIG + GLOBAL CSS 
 # ============================================
 st.set_page_config(
     page_title="Külək Sürəti Proqnozu – N-HiTS",
@@ -231,6 +240,7 @@ if st.button("🚀 Proqnozu Hesabla"):
         st.image("wind_forecast_plot.png", use_container_width=True)
 
 st.info("🧠 Model: N-HiTS | 📡 ERA5 məlumatları | 🔢 Giriş pəncərəsi: 168 saat")
+
 
 
 
