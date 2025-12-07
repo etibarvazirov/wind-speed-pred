@@ -125,11 +125,19 @@ def forecast_next_hour():
     df = get_era5()
     X, _ = preprocess(df)
 
+    # ========= DEBUG SCALER =========
+    st.write("🔍 Input mean:", float(X.mean()))
+    st.write("🔍 Input std:", float(X.std()))
+    st.write("🔍 Scaler mean sample:", scaler.mean_[:5])
+    st.write("🔍 Scaler scale sample:", scaler.scale_[:5])
+    # ================================
+
     inp = torch.tensor(X).float()
     with torch.no_grad():
         pred = model(inp).numpy().squeeze()
 
-    return max(float(pred), 0)   # no negative output
+    return max(float(pred), 0)
+
 
 
 # ===================================================
@@ -192,3 +200,4 @@ if st.button("🚀 Proqnozu Hesabla"):
         st.image("wind_forecast_plot.png", use_container_width=True)
 
 st.info("🧠 Model: N-HiTS | 📡 Məlumat: ERA5 | 🔢 Input pəncərəsi: 168 saat")
+
