@@ -227,7 +227,8 @@ if st.button("🚀 Proqnozu Hesabla"):
         st.image("feature_importance.png")
 
     with st.expander("🌬️ Modelin Nümunə Proqnozu"):
-        st.image("wind_forecast_plot.png")
+        st.image("wind_forecast_plot.png", width=550)
 
 st.info("🧠 Model: N-HiTS | 📡 ERA5 məlumatları | 🔢 Giriş pəncərəsi: 168 saat")
+
 
