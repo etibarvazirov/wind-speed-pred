@@ -152,4 +152,12 @@ if st.button("🔮 Proqnozu Hesabla"):
         st.caption("Model tərəfindən ardıcıl saatlıq proqnozların qrafiki")
 
     with st.expander("🧠 Feature Importance (Integrated Gradients)"):
-        st.image("Feature Importance via Integra
+        st.image("feature_importance.png", use_container_width=True)
+        st.caption("Modelin hansı xüsusiyyətlərə daha çox önəm verdiyini göstərir.")
+
+    with st.expander("🌬️ Model Nümunə Proqnozu"):
+        st.image("wind_forecast_plot.png", use_container_width=True)
+        st.caption("Modelin əvvəlki test nəticələrindən nümunə proqnoz.")
+
+
+st.info("🧠 Model: N-HiTS | 📡 Məlumat: ERA5 | 🔢 168 saatlıq giriş pəncərəsi")
