@@ -16,7 +16,7 @@ DEVICE = "cpu"
 FEATURES = [
     "wind_speed",
     "temperature",
-    "wind_direction",
+    # "wind_direction",
     "wind_dir_sin", "wind_dir_cos",
     "lag1", "lag3", "lag6", "lag12", "lag24",
     "roll6_mean", "roll12_mean", "roll24_mean",
@@ -131,6 +131,7 @@ if st.button("🔮 Predict Next Hour Wind Speed"):
     st.caption("Last 72 hours real wind speed from ERA5 API")
 
 st.info("Model: N-HiTS • Features: 16 • Sequence Length: 72 • Data: ERA5 Hourly")
+
 
 
 
