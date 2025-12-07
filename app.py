@@ -3,6 +3,7 @@ import torch
 import requests
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from model import NHiTS
 
 # ===================================================
@@ -15,7 +16,7 @@ st.set_page_config(
 )
 
 # ===================================================
-# PROJECT INTRO SECTION (DESIGN BLOCKS)
+# INTRO SECTION
 # ===================================================
 st.title("🌬️ Azərbaycan üçün Külək Sürəti Proqnozu — N-HiTS Modeli")
 
@@ -23,33 +24,13 @@ st.markdown("""
 <div style="padding:15px; border-radius:10px; background-color:#eef6ff;">
     <h3>📌 Layihə Haqqında</h3>
     Bu sistem ERA5 real vaxt atmosfer məlumatlarından istifadə edərək Azərbaycanın 
-    **növbəti saatlarda külək sürətini proqnozlaşdırır**. 
-    Model müasir **N-HiTS dərin öyrənmə arxitekturası** ilə öyrədilib.
-</div>
-<br>
-
-<div style="padding:15px; border-radius:10px; background-color:#f3f9ff;">
-    <h3>🎯 Layihənin Məqsədi</h3>
-    Külək sürətinin dəqiq proqnozu aşağıdakı sahələr üçün çox vacibdir:
-    <ul>
-        <li>🔌 Külək enerjisi istehsalının optimallaşdırılması</li>
-        <li>🚢 Nəqliyyat və logistik təhlükəsizliyi</li>
-        <li>🏗️ Tikinti və infrastruktur planlaşdırılması</li>
-        <li>🌪️ Güclü külək risklərinin öncədən aşkar edilməsi</li>
-    </ul>
-</div>
-<br>
-
-<div style="padding:15px; border-radius:10px; background-color:#e8fff3;">
-    <h3>🌤️ Proqnozun Faydası</h3>
-    Bu tətbiq külək sürətinin yaxın saatlarda dəyişməsini göstərərək 
-    istifadəçilərə **planlaşdırma, enerji idarəçiliyi və təhlükəsizlik üzrə** 
-    daha doğru qərarlar verməkdə kömək edir.
+    növbəti saat üçün külək sürətini proqnozlaşdırır. 
+    Model müasir N-HiTS dərin öyrənmə arxitekturası ilə öyrədilib.
 </div>
 """, unsafe_allow_html=True)
 
 # ===================================================
-# MODEL / SCALER CONFIG
+# CONFIG
 # ===================================================
 SEQ_LEN = 168
 NUM_FEATURES = 15
@@ -88,7 +69,7 @@ def load_model():
 model, scaler = load_model()
 
 # ===================================================
-# ERA5 FETCH
+# GET ERA5
 # ===================================================
 def get_era5():
     lat, lon = 40.4093, 49.8671
@@ -134,48 +115,32 @@ def preprocess(df):
     return X.reshape(1, SEQ_LEN, NUM_FEATURES), df
 
 # ===================================================
-# MULTI-STEP FORECAST (WITH NON-NEGATIVE CONSTRAINT)
+# 1-STEP FORECAST
 # ===================================================
-def forecast(hours):
+def forecast_next_hour():
     df = get_era5()
-    X, processed_df = preprocess(df)
+    X, _ = preprocess(df)
 
-    preds = []
     inp = torch.tensor(X).float()
+    with torch.no_grad():
+        pred = model(inp).numpy().squeeze()
 
-    for _ in range(hours):
-        with torch.no_grad():
-            pred = model(inp).numpy().squeeze()
-
-        pred = max(pred, 0)   # ❗ Fiziki məhdudiyyət: külək sürəti mənfi ola bilməz
-
-        preds.append(pred)
-
-        new_row = processed_df[FEATURES].iloc[-1].copy()
-        new_row["wind_speed"] = pred
-        processed_df.loc[len(processed_df)] = new_row
-
-        next_segment = processed_df[FEATURES].iloc[-SEQ_LEN:]
-        X_next = scaler.transform(next_segment.to_numpy()).reshape(1, SEQ_LEN, NUM_FEATURES)
-        inp = torch.tensor(X_next).float()
-
-    return preds
+    # No negative wind speed
+    pred = max(pred, 0)
+    return pred
 
 # ===================================================
-# UI — FORECAST SECTION
+# MAIN UI
 # ===================================================
-st.header("🔮 Real-Time Külək Sürəti Proqnozu")
+st.header("🔮 Növbəti 1 Saat üçün Proqnoz")
 
-hours = st.slider("⏳ Neçə saatlıq proqnoz edilsin?", 1, 24, 6)
+if st.button("🚀 Proqnozu Hesabla"):
+    pred = forecast_next_hour()
+    st.success(f"🌬️ **Növbəti 1 saat üçün proqnoz: {pred:.2f} m/s**")
 
-if st.button("🚀 Proqnozu Başlat"):
-    preds = forecast(hours)
-
-    st.success(f"📌 Növbəti {hours} saat üçün son proqnoz: **{preds[-1]:.2f} m/s**")
-
-    # -----------------------------------------------------------
-    # PERFORMANCE METRICS TABLE (STATIC FROM TRAINING)
-    # -----------------------------------------------------------
+    # ---------------------------
+    # PERFORMANCE TABLE
+    # ---------------------------
     metrics = pd.DataFrame({
         "Metrik": ["RMSE", "MAE", "R²"],
         "Dəyər": [0.1198718771429435, 0.26031019343740963, 0.8458048444802158]
@@ -183,29 +148,46 @@ if st.button("🚀 Proqnozu Başlat"):
     st.subheader("📊 Model Performans Metrikləri")
     st.table(metrics)
 
-    # -----------------------------------------------------------
-    # FORECAST TABLE
-    # -----------------------------------------------------------
-    df_pred = pd.DataFrame({
-        "Saat": list(range(1, hours + 1)),
-        "Proqnoz (m/s)": preds
-    })
-    st.subheader("📋 Saatlıq Proqnoz Cədvəli")
-    st.dataframe(df_pred, use_container_width=True)
+    # ===================================================
+    # NEW VISUALS SECTION
+    # ===================================================
+    df = get_era5()
+
+    with st.expander("📈 Son 72 Saatlıq Real Külək Sürəti Qrafiki"):
+        st.line_chart(df["wind_speed"].iloc[-72:], use_container_width=True)
+
+    with st.expander("🌪️ Külək İstiqaməti — Polar Plot (Wind Rose)"):
+        fig = plt.figure(figsize=(6,6))
+        ax = fig.add_subplot(111, polar=True)
+        theta = np.deg2rad(df["wind_direction"].iloc[-72:])
+        r = df["wind_speed"].iloc[-72:]
+        ax.scatter(theta, r, c=r, cmap="viridis")
+        ax.set_title("Son 72 saat üçün küləyin istiqaməti və sürəti")
+        st.pyplot(fig)
+
+    with st.expander("🔥 Temperatur vs Külək Sürəti Scatter Plot"):
+        fig2, ax2 = plt.subplots()
+        ax2.scatter(df["temperature"], df["wind_speed"], alpha=0.5)
+        ax2.set_xlabel("Temperatur (°C)")
+        ax2.set_ylabel("Külək sürəti (m/s)")
+        ax2.set_title("Temperatur və külək sürəti arasındakı əlaqə")
+        st.pyplot(fig2)
+
+    with st.expander("📊 Külək Sürəti Paylanması — Histogram"):
+        fig3, ax3 = plt.subplots()
+        ax3.hist(df["wind_speed"], bins=20, color="skyblue", edgecolor="black")
+        ax3.set_xlabel("Külək sürəti (m/s)")
+        ax3.set_ylabel("Tezlik")
+        ax3.set_title("Külək sürəti paylanması")
+        st.pyplot(fig3)
 
     # -----------------------------------------------------------
-    # EXPANDERS WITH PLOTS
+    # IG & Forecast EXAMPLE
     # -----------------------------------------------------------
-    with st.expander("📈 Proqnoz Qrafiki"):
-        st.line_chart(preds, use_container_width=True)
-        st.caption("Model tərəfindən ardıcıl saatlıq proqnoz.")
-
-    with st.expander("🧠 Feature Importance — Integrated Gradients"):
+    with st.expander("🧠 Feature Importance (Integrated Gradients)"):
         st.image("feature_importance.png", use_container_width=True)
-        st.caption("Modelin hansı xüsusiyyətlərə ən çox önəm verdiyini göstərir.")
 
-    with st.expander("🌬️ Model Nümunə Proqnoz Qrafiki"):
+    with st.expander("🌬️ Modelin Nümunə Proqnozu"):
         st.image("wind_forecast_plot.png", use_container_width=True)
-        st.caption("Modelin test zamanı əldə etdiyi nümunə proqnozu.")
 
-st.info("🧠 Model: N-HiTS | 📡 Məlumat: ERA5 API | 🔢 Giriş pəncərəsi: 168 saat")
+st.info("🧠 Model: N-HiTS | 📡 Məlumat: ERA5 | 🔢 Input pəncərəsi: 168 saat")
