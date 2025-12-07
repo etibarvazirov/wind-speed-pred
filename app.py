@@ -23,9 +23,9 @@ st.title("🌬️ Azərbaycan üçün Külək Sürəti Proqnozu — N-HiTS Model
 st.markdown("""
 <div style="padding:15px; border-radius:10px; background-color:#eef6ff;">
     <h3>📌 Layihə Haqqında</h3>
-    Bu sistem ERA5 real vaxt atmosfer məlumatlarından istifadə edərək Azərbaycanın 
-    növbəti saat üçün külək sürətini proqnozlaşdırır. 
-    Model müasir N-HiTS dərin öyrənmə arxitekturası ilə öyrədilib.
+    Bu tətbiq ERA5 real vaxt atmosfer məlumatları əsasında Azərbaycanın 
+    növbəti 1 saat üçün külək sürətini proqnozlaşdırır.
+    Model müasir N-HiTS dərin öyrənmə arxitekturası ilə hazırlanmışdır.
 </div>
 """, unsafe_allow_html=True)
 
@@ -68,8 +68,9 @@ def load_model():
 
 model, scaler = load_model()
 
+
 # ===================================================
-# GET ERA5
+# GET ERA5 (8 days → 192 hours)
 # ===================================================
 def get_era5():
     lat, lon = 40.4093, 49.8671
@@ -88,8 +89,9 @@ def get_era5():
     })
     return df
 
+
 # ===================================================
-# PREPROCESS
+# PREPROCESS (window = 168)
 # ===================================================
 def preprocess(df):
     df["wind_dir_sin"] = np.sin(np.deg2rad(df["wind_direction"]))
@@ -112,10 +114,12 @@ def preprocess(df):
 
     segment = df[FEATURES].iloc[-SEQ_LEN:]
     X = scaler.transform(segment.to_numpy())
+
     return X.reshape(1, SEQ_LEN, NUM_FEATURES), df
 
+
 # ===================================================
-# 1-STEP FORECAST
+# 1-STEP FORECAST (fixed)
 # ===================================================
 def forecast_next_hour():
     df = get_era5()
@@ -125,9 +129,8 @@ def forecast_next_hour():
     with torch.no_grad():
         pred = model(inp).numpy().squeeze()
 
-    # No negative wind speed
-    pred = max(pred, 0)
-    return pred
+    return max(float(pred), 0)   # no negative output
+
 
 # ===================================================
 # MAIN UI
@@ -136,6 +139,7 @@ st.header("🔮 Növbəti 1 Saat üçün Proqnoz")
 
 if st.button("🚀 Proqnozu Hesabla"):
     pred = forecast_next_hour()
+
     st.success(f"🌬️ **Növbəti 1 saat üçün proqnoz: {pred:.2f} m/s**")
 
     # ---------------------------
@@ -149,7 +153,7 @@ if st.button("🚀 Proqnozu Hesabla"):
     st.table(metrics)
 
     # ===================================================
-    # NEW VISUALS SECTION
+    # VISUALIZATIONS
     # ===================================================
     df = get_era5()
 
@@ -162,7 +166,7 @@ if st.button("🚀 Proqnozu Hesabla"):
         theta = np.deg2rad(df["wind_direction"].iloc[-72:])
         r = df["wind_speed"].iloc[-72:]
         ax.scatter(theta, r, c=r, cmap="viridis")
-        ax.set_title("Son 72 saat üçün küləyin istiqaməti və sürəti")
+        ax.set_title("Son 72 saat üçün külək istiqaməti və sürəti")
         st.pyplot(fig)
 
     with st.expander("🔥 Temperatur vs Külək Sürəti Scatter Plot"):
@@ -181,9 +185,6 @@ if st.button("🚀 Proqnozu Hesabla"):
         ax3.set_title("Külək sürəti paylanması")
         st.pyplot(fig3)
 
-    # -----------------------------------------------------------
-    # IG & Forecast EXAMPLE
-    # -----------------------------------------------------------
     with st.expander("🧠 Feature Importance (Integrated Gradients)"):
         st.image("feature_importance.png", use_container_width=True)
 
