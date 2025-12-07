@@ -9,8 +9,8 @@ from model import NHiTS
 # ===================================================
 # CONFIG
 # ===================================================
-SEQ_LEN = 72
-NUM_FEATURES = 16
+SEQ_LEN = 169
+NUM_FEATURES = 15
 DEVICE = "cpu"
 
 FEATURES = [
@@ -131,6 +131,7 @@ if st.button("🔮 Predict Next Hour Wind Speed"):
     st.caption("Last 72 hours real wind speed from ERA5 API")
 
 st.info("Model: N-HiTS • Features: 16 • Sequence Length: 72 • Data: ERA5 Hourly")
+
 
 
 
