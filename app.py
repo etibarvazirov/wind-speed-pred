@@ -24,14 +24,29 @@ FEATURES = [
 # LOAD SCALER & MODEL
 # ===================================================
 @st.cache_resource
-def load_model():
-    scaler = joblib.load("scaler.pkl")
 
+def load_model():
+    # Load scaler (numpy version — SAFE)
+    scaler_mean = np.load("scaler_mean.npy")
+    scaler_scale = np.load("scaler_scale.npy")
+
+    class SimpleScaler:
+        def __init__(self, mean, scale):
+            self.mean_ = mean
+            self.scale_ = scale
+        
+        def transform(self, X):
+            return (X - self.mean_) / self.scale_
+
+    scaler = SimpleScaler(scaler_mean, scaler_scale)
+
+    # Load model
     model = NHiTS(seq_len=SEQ_LEN, num_features=len(FEATURES))
-    model.load_state_dict(torch.load("n_hits_wind_model.pth", map_location=DEVICE))
+    model.load_state_dict(torch.load("n_hits_wind_model.pth", map_location="cpu"))
     model.eval()
 
     return model, scaler
+
 
 model, scaler = load_model()
 
@@ -112,3 +127,4 @@ if st.button("🔮 Predict Next Hour Wind Speed"):
     st.caption("Last 72 hours real wind speed from ERA5 API")
 
 st.info("Model: N-HiTS • Features: 16 • Sequence Length: 72 • Data: ERA5 Hourly")
+
