@@ -26,14 +26,42 @@ img, .stPlotlyChart, .stImage > img {
 # ============================================
 # INTRO SECTION
 # ============================================
-st.markdown("## 🌬️ **Külək Sürəti Proqnozu — N-HiTS Modeli**")
-st.markdown("### ERA5 real vaxt məlumatları ilə dəqiq və stabil külək proqnozu")
 
+# Title Box
 st.markdown("""
-Bu tətbiq son **168 saatlıq ERA5 məlumatlarından** istifadə edərək Azərbaycanın növbəti 1 saat üçün
-**külək sürətini proqnozlaşdırır**.  
-Model **N-HiTS dərin öyrənmə arxitekturası** ilə tren olunmuşdur və yüksək stabillik göstərir.
-""")
+<div style="
+    background-color:#e6f2ff;
+    padding:18px;
+    border-radius:12px;
+    border:1px solid #bcd9ff;
+">
+    <h2 style="margin:0; padding:0;">🌬️ Külək Sürəti Proqnozu — N-HiTS Modeli</h2>
+    <p style="margin-top:6px; font-size:16px;">
+        ERA5 real vaxt məlumatları ilə dəqiq və stabil külək proqnozu
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+st.write("")  # small spacing
+
+# Description Box
+st.markdown("""
+<div style="
+    background-color:#f7fbff;
+    padding:16px;
+    border-radius:10px;
+    border-left: 5px solid #4da3ff;
+    font-size:15px;
+    line-height:1.5;
+">
+Bu tətbiq son <b>168 saatlıq ERA5 atmosfer məlumatlarından</b> istifadə edərək Azərbaycanın 
+növbəti 1 saat üçün <b>külək sürətini proqnozlaşdırır</b>.
+
+Model <b>N-HiTS</b> dərin öyrənmə arxitekturası ilə öyrədilmişdir və 
+proqnozlarda yüksək stabillik və ardıcıllıq təmin edir.
+</div>
+""", unsafe_allow_html=True)
+
 
 with st.expander("ℹ️ Modeldə istifadə olunan xüsusiyyətlər haqqında qısa izah"):
     st.markdown("""
@@ -202,3 +230,4 @@ if st.button("🚀 Proqnozu Hesabla"):
         st.image("wind_forecast_plot.png")
 
 st.info("🧠 Model: N-HiTS | 📡 ERA5 məlumatları | 🔢 Giriş pəncərəsi: 168 saat")
+
