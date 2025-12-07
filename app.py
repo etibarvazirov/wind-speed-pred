@@ -71,14 +71,14 @@ def get_realtime_era5():
         "https://api.open-meteo.com/v1/forecast?"
         f"latitude={lat}&longitude={lon}"
         "&hourly=windspeed_10m,temperature_2m,winddirection_10m"
-        "&forecast_days=3"
+        "&forecast_days=7"
     )
     r = requests.get(url).json()
 
     df = pd.DataFrame({
-        "wind_speed": r["hourly"]["windspeed_10m"][:72],
-        "temperature": r["hourly"]["temperature_2m"][:72],
-        "wind_direction": r["hourly"]["winddirection_10m"][:72],
+        "wind_speed": r["hourly"]["windspeed_10m"][:168],
+        "temperature": r["hourly"]["temperature_2m"][:168],
+        "wind_direction": r["hourly"]["winddirection_10m"][:168],
     })
     return df
 
@@ -146,6 +146,7 @@ if st.button("🔮 Predict Next Hour Wind Speed"):
     st.caption("Last 72 hours real wind speed from ERA5 API")
 
 st.info("Model: N-HiTS • Features: 16 • Sequence Length: 72 • Data: ERA5 Hourly")
+
 
 
 
