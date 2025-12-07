@@ -8,7 +8,7 @@ from model import NHiTS
 # ===================================================
 # CONFIG
 # ===================================================
-SEQ_LEN = 168        # model training sequence
+SEQ_LEN = 168
 NUM_FEATURES = 15
 DEVICE = "cpu"
 
@@ -20,7 +20,7 @@ FEATURES = [
 ]
 
 # ===================================================
-# LOAD SCALER & MODEL
+# LOAD MODEL & SCALER
 # ===================================================
 @st.cache_resource
 def load_model():
@@ -43,11 +43,10 @@ def load_model():
 
     return model, scaler
 
-
 model, scaler = load_model()
 
 # ===================================================
-# GET 8-DAY REALTIME ERA5 (ALWAYS ENOUGH!)
+# GET ERA5
 # ===================================================
 def get_era5():
     lat, lon = 40.4093, 49.8671
@@ -57,7 +56,6 @@ def get_era5():
         "&hourly=windspeed_10m,temperature_2m,winddirection_10m"
         "&forecast_days=8"
     )
-
     r = requests.get(url).json()
 
     df = pd.DataFrame({
@@ -89,12 +87,12 @@ def preprocess(df):
 
     df = df.dropna().reset_index(drop=True)
 
-    segment = df[FEATURES].iloc[-SEQ_LEN:]  # ALWAYS 168 HOURS
+    segment = df[FEATURES].iloc[-SEQ_LEN:]
     X = scaler.transform(segment.to_numpy())
     return X.reshape(1, SEQ_LEN, NUM_FEATURES), df
 
 # ===================================================
-# MULTI-STEP FORECAST
+# FORECAST
 # ===================================================
 def forecast(hours):
     df = get_era5()
@@ -109,7 +107,6 @@ def forecast(hours):
 
         preds.append(pred)
 
-        # Shift window: remove oldest hour, append predicted speed
         new_row = processed_df[FEATURES].iloc[-1].copy()
         new_row["wind_speed"] = pred
         processed_df.loc[len(processed_df)] = new_row
@@ -126,16 +123,33 @@ def forecast(hours):
 # ===================================================
 st.title("🌬️ Azərbaycan üçün Külək Sürəti Proqnozu — N-HiTS Modeli")
 st.markdown("""
-Bu tətbiq real vaxt ERA5 məlumatları əsasında **növbəti saatların külək sürətini** 
-N-HiTS kimi müasir dərin öyrənmə modeli ilə proqnozlaşdırır.
+Bu sistem ERA5 real vaxt məlumatlarına əsaslanaraq **növbəti saatların külək sürətini**
+N-HiTS kimi müasir dərin öyrənmə modeli vasitəsilə proqnozlaşdırır.
 """)
 
-hours = st.slider("🌤️ Neçə saatlıq proqnoz istəyirsiniz?", 1, 24, 6)
+hours = st.slider("⏳ Neçə saatlıq proqnoz istəyirsiniz?", 1, 24, 6)
 
 if st.button("🔮 Proqnozu Hesabla"):
     preds = forecast(hours)
-    st.success(f"📌 **Növbəti {hours} saat üçün proqnoz:** {preds[-1]:.2f} m/s")
-    st.line_chart(preds, use_container_width=True)
-    st.caption("Model tərəfindən ardıcıl saatlıq proqnozlar")
 
-st.info("🧠 Model: N-HiTS | 📡 Məlumat: ERA5 | 🔢 168 saatlıq giriş pəncərəsi")
+    st.success(f"📌 **Növbəti {hours} saat üçün son proqnoz:** {preds[-1]:.2f} m/s")
+
+    # ---------------------------
+    # RESULTS TABLE
+    # ---------------------------
+    df_pred = pd.DataFrame({
+        "Saat": list(range(1, hours + 1)),
+        "Proqnoz (m/s)": preds
+    })
+    st.subheader("📋 Proqnoz Cədvəli")
+    st.dataframe(df_pred, use_container_width=True)
+
+    # ---------------------------
+    # ACCORDION – PLOTS
+    # ---------------------------
+    with st.expander("📈 Proqnoz Qrafiki"):
+        st.line_chart(preds, use_container_width=True)
+        st.caption("Model tərəfindən ardıcıl saatlıq proqnozların qrafiki")
+
+    with st.expander("🧠 Feature Importance (Integrated Gradients)"):
+        st.image("Feature Importance via Integra
