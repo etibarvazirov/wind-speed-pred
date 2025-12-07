@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 
+# ============================================
+# N-HiTS BLOCK
+# ============================================
 class NHiTSBlock(nn.Module):
     def __init__(self, input_size, hidden_size, output_size):
         super().__init__()
@@ -14,28 +17,30 @@ class NHiTSBlock(nn.Module):
         x = self.relu(self.fc2(x))
         return self.fc3(x)
 
+# ============================================
+# N-HiTS MAIN MODEL
+# ============================================
 class NHiTS(nn.Module):
-    def __init__(self, seq_len, num_features, hidden_size=128, num_blocks=3):
+    def __init__(self, seq_len=168, num_features=14, hidden_size=128, num_blocks=3):
         super().__init__()
         self.seq_len = seq_len
         self.num_features = num_features
-        
-        input_size = seq_len * num_features
+
+        input_size = seq_len * num_features  # 168 × 14 = 2352
+
+        # Model consists of several forecasting blocks
         self.blocks = nn.ModuleList([
             NHiTSBlock(input_size, hidden_size, 1)
             for _ in range(num_blocks)
         ])
 
     def forward(self, x):
-        # x: (batch, seq_len, num_features)
+        # x shape: (batch, seq_len, num_features)
         b, s, f = x.shape
-        x = x.reshape(b, s * f)
-        
-        y = None
-        for block in self.blocks:
-            if y is None:
-                y = block(x)
-            else:
-                y = y + block(x)
+        x = x.reshape(b, s * f)  # flatten → (batch, 2352)
 
-        return y  # DO NOT SQUEEZE
+        out = 0
+        for block in self.blocks:
+            out = out + block(x)
+
+        return out.squeeze()  # final scalar output
