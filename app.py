@@ -1,14 +1,14 @@
 import streamlit as st
 import torch
+import requests
 import numpy as np
 import pandas as pd
-import requests
 from model import NHiTS
 
-# ====================================================
-# SƏTİRLƏR — KONFİQURASİYA
-# ====================================================
-SEQ_LEN = 168
+# ===================================================
+# CONFIG
+# ===================================================
+SEQ_LEN = 168        # model training sequence
 NUM_FEATURES = 15
 DEVICE = "cpu"
 
@@ -19,9 +19,9 @@ FEATURES = [
     "roll6_std", "roll12_std", "roll24_std"
 ]
 
-# ====================================================
-# MODEL & SCALER YÜKLƏNMƏSİ
-# ====================================================
+# ===================================================
+# LOAD SCALER & MODEL
+# ===================================================
 @st.cache_resource
 def load_model():
     scaler_mean = np.load("scaler_mean.npy")
@@ -43,39 +43,34 @@ def load_model():
 
     return model, scaler
 
+
 model, scaler = load_model()
 
-
-# ====================================================
-# REAL-TIME ERA5 MƏLUMATLARININ ALINMASI
-# ====================================================
-def get_era5(hours):
-    days = int(np.ceil(hours / 24)) + 1   # rolling üçün əlavə 1 gün
-    lat, lon = 40.4093, 49.8671           # Bakı
-
+# ===================================================
+# GET 8-DAY REALTIME ERA5 (ALWAYS ENOUGH!)
+# ===================================================
+def get_era5():
+    lat, lon = 40.4093, 49.8671
     url = (
         "https://api.open-meteo.com/v1/forecast?"
         f"latitude={lat}&longitude={lon}"
         "&hourly=windspeed_10m,temperature_2m,winddirection_10m"
-        f"&forecast_days={days}"
+        "&forecast_days=8"
     )
 
     r = requests.get(url).json()
 
-    total_needed = hours + 24  # roll24 üçün əlavə 24 saat
     df = pd.DataFrame({
-        "wind_speed": r["hourly"]["windspeed_10m"][:total_needed],
-        "temperature": r["hourly"]["temperature_2m"][:total_needed],
-        "wind_direction": r["hourly"]["winddirection_10m"][:total_needed],
+        "wind_speed": r["hourly"]["windspeed_10m"][:192],
+        "temperature": r["hourly"]["temperature_2m"][:192],
+        "wind_direction": r["hourly"]["winddirection_10m"][:192],
     })
-
     return df
 
-
-# ====================================================
-# PREPROCESS FUNKSIYASI
-# ====================================================
-def preprocess(df, hours):
+# ===================================================
+# PREPROCESS
+# ===================================================
+def preprocess(df):
     df["wind_dir_sin"] = np.sin(np.deg2rad(df["wind_direction"]))
     df["wind_dir_cos"] = np.cos(np.deg2rad(df["wind_direction"]))
 
@@ -88,79 +83,59 @@ def preprocess(df, hours):
     df["roll6_mean"]  = df["wind_speed"].rolling(6).mean()
     df["roll12_mean"] = df["wind_speed"].rolling(12).mean()
     df["roll24_mean"] = df["wind_speed"].rolling(24).mean()
-
-    df["roll6_std"]  = df["wind_speed"].rolling(6).std()
-    df["roll12_std"] = df["wind_speed"].rolling(12).std()
-    df["roll24_std"] = df["wind_speed"].rolling(24).std()
+    df["roll6_std"]   = df["wind_speed"].rolling(6).std()
+    df["roll12_std"]  = df["wind_speed"].rolling(12).std()
+    df["roll24_std"]  = df["wind_speed"].rolling(24).std()
 
     df = df.dropna().reset_index(drop=True)
 
-    segment = df[FEATURES].iloc[-SEQ_LEN:]  # son 168 saat
+    segment = df[FEATURES].iloc[-SEQ_LEN:]  # ALWAYS 168 HOURS
     X = scaler.transform(segment.to_numpy())
     return X.reshape(1, SEQ_LEN, NUM_FEATURES), df
 
-
-# ====================================================
-# PROQNOZ FUNKSIYASI
-# ====================================================
+# ===================================================
+# MULTI-STEP FORECAST
+# ===================================================
 def forecast(hours):
-    df = get_era5(hours)
-    X, processed_df = preprocess(df, hours)
+    df = get_era5()
+    X, processed_df = preprocess(df)
 
     preds = []
     inp = torch.tensor(X).float()
 
     for _ in range(hours):
         with torch.no_grad():
-            p = model(inp).item()
-        preds.append(p)
+            pred = model(inp).numpy().squeeze()
 
-        # Yeni proqnozu inputa daxil et
-        next_row = inp.numpy()[0, -1, :].copy()
-        next_row[FEATURES.index("wind_speed")] = p
+        preds.append(pred)
 
-        new_input = np.vstack([inp.numpy()[0, 1:, :], next_row])
-        inp = torch.tensor(new_input.reshape(1, SEQ_LEN, NUM_FEATURES)).float()
+        # Shift window: remove oldest hour, append predicted speed
+        new_row = processed_df[FEATURES].iloc[-1].copy()
+        new_row["wind_speed"] = pred
+        processed_df.loc[len(processed_df)] = new_row
 
-    return preds, processed_df
+        next_segment = processed_df[FEATURES].iloc[-SEQ_LEN:]
+        X_next = scaler.transform(next_segment.to_numpy()).reshape(1, SEQ_LEN, NUM_FEATURES)
+        inp = torch.tensor(X_next).float()
+
+    return preds
 
 
-# ====================================================
-# STREAMLIT İSTİFADƏÇİ İNTERFEYSİ
-# ====================================================
-st.title("🌬️ **Azerbaycanda Real-Time Külək Sürəti Proqnozu (N-HiTS Modeli)**")
+# ===================================================
+# STREAMLIT UI
+# ===================================================
+st.title("🌬️ Azərbaycan üçün Külək Sürəti Proqnozu — N-HiTS Modeli")
 st.markdown("""
-Bu tətbiq ERA5 real-time meteoroloji məlumatları əsasında  
-**N-HiTS (Neural Hierarchical Interpolation for Time-Series)** modeli ilə  
-gələcək saatlar üçün külək sürətini proqnoz edir.
+Bu tətbiq real vaxt ERA5 məlumatları əsasında **növbəti saatların külək sürətini** 
+N-HiTS kimi müasir dərin öyrənmə modeli ilə proqnozlaşdırır.
 """)
 
-# ---------------- Sidebar ----------------
-st.sidebar.header("🔧 Parametrlər")
-hours = st.sidebar.slider("Neçə saatlıq proqnoz verilsin?", 1, 24, 6)
+hours = st.slider("🌤️ Neçə saatlıq proqnoz istəyirsiniz?", 1, 24, 6)
 
-
-# ---------------- Buttons ----------------
-if st.button("🔮 Proqnoz et"):
-    with st.spinner("Hesablanır..."):
-        preds, df_processed = forecast(hours)
-
-    st.success(f"🌬️ Növbəti **{hours} saat** üçün külək proqnozu hazırdır!")
-
+if st.button("🔮 Proqnozu Hesabla"):
+    preds = forecast(hours)
+    st.success(f"📌 **Növbəti {hours} saat üçün proqnoz:** {preds[-1]:.2f} m/s")
     st.line_chart(preds, use_container_width=True)
-    st.caption("Modelin proqnoz etdiyi külək sürəti (m/s)")
+    st.caption("Model tərəfindən ardıcıl saatlıq proqnozlar")
 
-
-# ---------------- Charts Section ----------------
-st.header("📊 Qrafik Analizləri")
-
-with st.expander("📌 **Xüsusiyyətlərin Əhəmiyyəti (Integrated Gradients)**"):
-    st.image("feature_importance.png", use_column_width=True)
-    st.write("Bu qrafik modelin ən çox hansı dəyişənlərə həssas olduğunu göstərir.")
-
-with st.expander("📌 **ERA5 + N-HiTS Külək Proqnozu Qrafiki**"):
-    st.image("wind_forecast_plot.png", use_column_width=True)
-    st.write("N-HiTS modeli küləyin real və proqnoz edilmiş dəyişimini göstərir.")
-
-
-st.info("Bu sistem tədris və tədqiqat məqsədləri üçün hazırlanmışdır.")
+st.info("🧠 Model: N-HiTS | 📡 Məlumat: ERA5 | 🔢 168 saatlıq giriş pəncərəsi")
